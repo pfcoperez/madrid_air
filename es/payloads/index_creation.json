@@ -1,0 +1,19 @@
+{
+    "settings" : {
+        "number_of_shards" : 1
+    },
+    "mappings" : {
+        "madrid_air_measurements" : {
+            "properties" : {
+                "timestamp": { "type": "date" },
+                "location" : { "type" : "geo_point" },
+                "measurement": {
+                    "properties": {
+                        "value": { "type": "double" },
+                        "label": { "type": "text" }
+                    }
+                }
+            }
+        }
+    }
+}
