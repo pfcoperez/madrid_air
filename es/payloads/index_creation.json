@@ -10,6 +10,7 @@
                 "measurement": {
                     "properties": {
                         "value": { "type": "double" },
+                        "chemical": { "type": "integer" },
                         "label": { "type": "text" }
                     }
                 }

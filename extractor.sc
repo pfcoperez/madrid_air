@@ -74,7 +74,7 @@ import org.joda.time.DateTime
 
 case class Location(lat: Double, lon: Double)
 
-case class Measurement(value: Double, label: String)
+case class Measurement(value: Double, chemical: Int, label: String)
 
 case class Entry(timestamp: DateTime, location: Location, measurement: Measurement)
 
@@ -94,10 +94,11 @@ def main(uri: String = "http://www.mambiente.munimadrid.es/opendata/horario.csv"
 
     positionalEntry.drop(8).toList.grouped(2).zipWithIndex collect {
       case (List(value, "V"), hour) =>
+        val chemId = entry("MAGNITUD").toInt
         Entry(
           timestamp = new DateTime(entry("ANO").toInt, entry("MES").toInt, entry("DIA").toInt, hour, 0, 0),
           location = locations(entry("ESTACION").toInt),
-          measurement = Measurement(value.toDouble, chemsTable(entry("MAGNITUD").toInt))
+          measurement = Measurement(value.toDouble, chemId, chemsTable(chemId))
         )
     }
   }
