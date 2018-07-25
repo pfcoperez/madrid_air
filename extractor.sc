@@ -4,23 +4,23 @@ import $ivy.`io.circe::circe-parser:0.9.3`
 import $ivy.`joda-time:joda-time:2.10`
   
 val chemsTable = Map(
-  1 -> "SO2",
-  6 -> "CO",
-  7 -> "NO",
-  8 -> "NO2",
-  9 -> "PM2.5",
-  10 -> "PM10",
-  12 -> "NOx",
-  14 -> "O3",
-  20 -> "TOL",
-  30 -> "BEN",
-  35 -> "EBE",
-  37 -> "MXY",
-  38 -> "PXY",
-  39 -> "OXY",
-  42 -> "TCH",
-  43 -> "CH4",
-  44 -> "NMHC",
+  1 -> ("SO2", "μg/m^3"),
+  6 -> ("CO", "mg/m^3"),
+  7 -> ("NO", "μg/m^3"),
+  8 -> ("NO2", "μg/m^3"),
+  9 -> ("PM2.5", "μg/m^3"),
+  10 -> ("PM10", "μg/m^3"),
+  12 -> ("NOx", "μg/m^3"),
+  14 -> ("O3", "μg/m^3"),
+  20 -> ("TOL", "μg/m^3"),
+  30 -> ("BEN", "μg/m^3"),
+  35 -> ("EBE", "μg/m^3"),
+  37 -> ("MXY", "μg/m^3"),
+  38 -> ("PXY", "μg/m^3"),
+  39 -> ("OXY", "μg/m^3"),
+  42 -> ("TCH", "mg/m^3"),
+  43 -> ("CH4", "mg/m^3"),
+  44 -> ("NMHC", "mg/m^3")
 )
 
 val locations = Map(
@@ -47,8 +47,8 @@ val locations = Map(
   17 -> Location(40.34163,-3.714672),
   18 -> Location(40.3947827,-3.7341903),
   19 -> Location(40.4072764,-3.7438868),
-  20 -> Location(0.4055786,-3.6602518),
-  36 -> Location(0.4055786,-3.6602518),
+  20 -> Location(40.55786,-3.6602518),
+  36 -> Location(40.55786,-3.6602518),
   21 -> Location(40.4392971,-3.7195004),
   22 -> Location(40.4047324,-3.717898),
   23 -> Location(40.4482254,-3.6085951),
@@ -74,38 +74,69 @@ import org.joda.time.DateTime
 
 case class Location(lat: Double, lon: Double)
 
-case class Measurement(value: Double, chemical: Int, label: String)
+case class Measurement(value: Double, chemical: String, unit: String)
 
 case class Entry(timestamp: DateTime, location: Location, measurement: Measurement)
 
+case class BulkIndexActionInfo(_index: String, _id: String, _type: Option[String])
+case class BulkIndexAction(index: BulkIndexActionInfo)
+
 @main
-def main(uri: String = "http://www.mambiente.munimadrid.es/opendata/horario.csv") {
+def main(uri: String = "http://www.mambiente.munimadrid.es/opendata/horario.csv", bulkIndex: String = "", bulkType: String = "") {
 
   import io.circe._, io.circe.syntax._, io.circe.generic.auto._
   implicit val dateTimeEncoder: Encoder[DateTime] = Encoder.instance(a => a.getMillis.asJson)
 
   lazy val sourceLines = scala.io.Source.fromURL(uri).getLines().toList
-  lazy val label2pos = sourceLines.head.split(";").zipWithIndex.toMap
 
-  lazy val rawEntries = sourceLines.tail
-  lazy val entries = rawEntries flatMap { rawEntry =>
-    val positionalEntry = rawEntry.split(";").toVector
-    val entry = label2pos.mapValues(positionalEntry)
+  sourceLines.headOption foreach { head =>
 
-    positionalEntry.drop(8).toList.grouped(2).zipWithIndex collect {
-      case (List(value, "V"), hour) =>
-        val chemId = entry("MAGNITUD").toInt
-        Entry(
-          timestamp = new DateTime(entry("ANO").toInt, entry("MES").toInt, entry("DIA").toInt, hour, 0, 0),
-          location = locations(entry("ESTACION").toInt),
-          measurement = Measurement(value.toDouble, chemId, chemsTable(chemId))
-        )
+    lazy val label2pos = head.split(";").zipWithIndex.toMap
+
+    lazy val entries = sourceLines.tail flatMap { rawEntry =>
+      val positionalEntry = rawEntry.split(";").toVector
+      val entry = label2pos.mapValues(positionalEntry)
+
+      positionalEntry.drop(8).toList.grouped(2).zipWithIndex collect {
+        case (List(value, "V"), hour) =>
+
+          val stationId = entry("ESTACION").toInt
+          val timestamp = new DateTime(
+            entry("ANO").toInt,
+            entry("MES").toInt,
+            entry("DIA").toInt,
+            hour, 0, 0
+          )
+          val (chemical, unit) = chemsTable(entry("MAGNITUD").toInt)
+
+          Entry(
+            timestamp,
+            location = locations(stationId),
+            measurement = Measurement(value.toDouble, chemical, unit)
+          )
+      }
     }
+
+    val asJsonStrings = entries flatMap { (entry: Entry) =>
+      Some(bulkIndex).filter(_.nonEmpty).toList.map { index =>
+
+        val entryId = {
+          import entry._
+          val id = s"${timestamp}_${location}_${measurement.chemical}"
+          java.util.Base64.getEncoder.encodeToString(id.getBytes)
+        }
+
+        BulkIndexAction(
+          BulkIndexActionInfo(
+            _index = index,
+            _id = entryId,
+            _type = Some(bulkType).filter(_.nonEmpty)
+          )
+        ).asJson.noSpaces
+      } :+ entry.asJson.noSpaces
+    }
+
+    asJsonStrings.foreach(println)
   }
 
-  val asJsonStrings = entries map { (entry: Entry) =>
-    entry.asJson.noSpaces
-  }
-
-  asJsonStrings.foreach(println)
 }
