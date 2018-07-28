@@ -2,25 +2,27 @@ import $ivy.`io.circe::circe-core:0.9.3`
 import $ivy.`io.circe::circe-generic:0.9.3`
 import $ivy.`io.circe::circe-parser:0.9.3`
 import $ivy.`joda-time:joda-time:2.10`
-  
+
+case class ChemicalEntry(name: String, unit: String, whoLimit: Option[Double] = None)
+
 val chemsTable = Map(
-  1 -> ("SO2", "μg/m^3"),
-  6 -> ("CO", "mg/m^3"),
-  7 -> ("NO", "μg/m^3"),
-  8 -> ("NO2", "μg/m^3"),
-  9 -> ("PM2.5", "μg/m^3"),
-  10 -> ("PM10", "μg/m^3"),
-  12 -> ("NOx", "μg/m^3"),
-  14 -> ("O3", "μg/m^3"),
-  20 -> ("TOL", "μg/m^3"),
-  30 -> ("BEN", "μg/m^3"),
-  35 -> ("EBE", "μg/m^3"),
-  37 -> ("MXY", "μg/m^3"),
-  38 -> ("PXY", "μg/m^3"),
-  39 -> ("OXY", "μg/m^3"),
-  42 -> ("TCH", "mg/m^3"),
-  43 -> ("CH4", "mg/m^3"),
-  44 -> ("NMHC", "mg/m^3")
+  1 -> ChemicalEntry("SO2", "μg/m^3", Some(20.0)),
+  6 -> ChemicalEntry("CO", "mg/m^3"),
+  7 -> ChemicalEntry("NO", "μg/m^3"),
+  8 -> ChemicalEntry("NO2", "μg/m^3", Some(200.0)),
+  9 -> ChemicalEntry("PM2.5", "μg/m^3", Some(25.0)),
+  10 -> ChemicalEntry("PM10", "μg/m^3", Some(50.0)),
+  12 -> ChemicalEntry("NOx", "μg/m^3"),
+  14 -> ChemicalEntry("O3", "μg/m^3", Some(100.0)),
+  20 -> ChemicalEntry("TOL", "μg/m^3"),
+  30 -> ChemicalEntry("BEN", "μg/m^3"),
+  35 -> ChemicalEntry("EBE", "μg/m^3"),
+  37 -> ChemicalEntry("MXY", "μg/m^3"),
+  38 -> ChemicalEntry("PXY", "μg/m^3"),
+  39 -> ChemicalEntry("OXY", "μg/m^3"),
+  42 -> ChemicalEntry("TCH", "mg/m^3"),
+  43 -> ChemicalEntry("CH4", "mg/m^3"),
+  44 -> ChemicalEntry("NMHC", "mg/m^3")
 )
 
 val locations = Map(
@@ -74,7 +76,7 @@ import org.joda.time.DateTime
 
 case class Location(lat: Double, lon: Double)
 
-case class Measurement(value: Double, chemical: String, unit: String)
+case class Measurement(value: Double, chemical: String, unit: String, who_limit: Option[Double])
 
 case class Entry(timestamp: DateTime, location: Location, measurement: Measurement)
 
@@ -107,12 +109,12 @@ def main(uri: String = "http://www.mambiente.munimadrid.es/opendata/horario.csv"
             entry("DIA").toInt,
             hour, 0, 0
           )
-          val (chemical, unit) = chemsTable(entry("MAGNITUD").toInt)
+          val ChemicalEntry(chemical, unit, limit) = chemsTable(entry("MAGNITUD").toInt)
 
           Entry(
             timestamp,
             location = locations(stationId),
-            measurement = Measurement(value.toDouble, chemical, unit)
+            measurement = Measurement(value.toDouble, chemical, unit, limit)
           )
       }
     }

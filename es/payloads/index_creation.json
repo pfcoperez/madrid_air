@@ -3,13 +3,14 @@
         "number_of_shards" : 1
     },
     "mappings" : {
-        "madrid_air_measurements" : {
+        "air_measurements" : {
             "properties" : {
                 "timestamp": { "type": "date" },
                 "location" : { "type" : "geo_point" },
                 "measurement": {
                     "properties": {
                         "value": { "type": "double" },
+                        "who_limit": { "type": "double" },
                         "chemical": { "type": "keyword" },
                         "unit": { "type": "keyword" }
                     }
