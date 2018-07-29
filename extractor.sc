@@ -1,3 +1,5 @@
+#!/usr/local/bin/amm
+
 import $ivy.`io.circe::circe-core:0.9.3`
 import $ivy.`io.circe::circe-generic:0.9.3`
 import $ivy.`io.circe::circe-parser:0.9.3`
@@ -84,33 +86,43 @@ case class BulkIndexActionInfo(_index: String, _id: String, _type: Option[String
 case class BulkIndexAction(index: BulkIndexActionInfo)
 
 @main
-def main(uri: String = "http://www.mambiente.munimadrid.es/opendata/horario.csv", bulkIndex: String = "", bulkType: String = "") {
+def extractor(uri: String = "http://www.mambiente.munimadrid.es/opendata/horario.csv", bulkIndex: String = "", bulkType: String = "") {
 
   import io.circe._, io.circe.syntax._, io.circe.generic.auto._
   implicit val dateTimeEncoder: Encoder[DateTime] = Encoder.instance(a => a.getMillis.asJson)
 
+  // Fetch the file from Madrid's city hall open data portal
   lazy val sourceLines = scala.io.Source.fromURL(uri).getLines().toList
 
   sourceLines.headOption foreach { head =>
 
+    /* The CSV first line contains the columns labels, it is not difficult
+       to compute a map from label to position thus making the rest of the code 
+       more readable. */
     lazy val label2pos = head.split(";").zipWithIndex.toMap
 
+    // For each line, we'll produce several events, that's easilt via flatMap
     lazy val entries = sourceLines.tail flatMap { rawEntry =>
       val positionalEntry = rawEntry.split(";").toVector
       val entry = label2pos.mapValues(positionalEntry)
 
+      /* The first 8 positions are used to extract the information common to the
+       24 hourly measurements. */
+      val stationId = entry("ESTACION").toInt
+      val ChemicalEntry(chemical, unit, limit) = chemsTable(entry("MAGNITUD").toInt)
+
+      // Measurement values are contained in the 24 last columns
       positionalEntry.drop(8).toList.grouped(2).zipWithIndex collect {
         case (List(value, "V"), hour) =>
 
-          val stationId = entry("ESTACION").toInt
           val timestamp = new DateTime(
             entry("ANO").toInt,
             entry("MES").toInt,
             entry("DIA").toInt,
             hour, 0, 0
           )
-          val ChemicalEntry(chemical, unit, limit) = chemsTable(entry("MAGNITUD").toInt)
 
+          // And there it go: The generated event as a case class!
           Entry(
             timestamp,
             location = locations(stationId),
@@ -119,6 +131,9 @@ def main(uri: String = "http://www.mambiente.munimadrid.es/opendata/horario.csv"
       }
     }
 
+    /* The collection of events is then serialized and printed in the standard ouput.
+       That way, we can use them as a ndjson file.
+     */
     val asJsonStrings = entries flatMap { (entry: Entry) =>
       Some(bulkIndex).filter(_.nonEmpty).toList.map { index =>
 
@@ -128,6 +143,8 @@ def main(uri: String = "http://www.mambiente.munimadrid.es/opendata/horario.csv"
           java.util.Base64.getEncoder.encodeToString(id.getBytes)
         }
 
+        /* Optionally, we can also serialize bulk actions to improve data transfer 
+           performance. */
         BulkIndexAction(
           BulkIndexActionInfo(
             _index = index,
