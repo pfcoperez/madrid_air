@@ -2,7 +2,7 @@
 
 if [ $# -ne 1 ]; then
     echo "Credentials file file is required";
-    exit 1
+    exit 0
 fi;
 
 FILE=$1
