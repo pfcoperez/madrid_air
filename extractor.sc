@@ -86,7 +86,9 @@ case class BulkIndexActionInfo(_index: String, _id: String, _type: Option[String
 case class BulkIndexAction(index: BulkIndexActionInfo)
 
 @main
-def extractor(uri: String = "http://www.mambiente.munimadrid.es/opendata/horario.csv", bulkIndex: String = "", bulkType: String = "") {
+def extractor(uri: String = "http://www.mambiente.munimadrid.es/opendata/horario.csv", bulkIndex: String = "", bulkType: String = "", noop: Boolean = false) {
+
+  if(noop) return // Trick to make the script fetch its dependencies end end. Used to docker image generation
 
   import io.circe._, io.circe.syntax._, io.circe.generic.auto._
   implicit val dateTimeEncoder: Encoder[DateTime] = Encoder.instance(a => a.getMillis.asJson)
