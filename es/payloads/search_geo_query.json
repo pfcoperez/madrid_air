@@ -1,0 +1,37 @@
+{
+    "size": "1",
+    "sort": [
+        {
+            "timestamp" : {"order" : "desc"}
+        },
+        {
+            "_geo_distance": {
+                "location" : {
+                    "lat" : 40.4142923,
+                    "lon" : -3.6912903
+                },
+                "order":         "asc",
+                "unit":          "km", 
+                "distance_type": "plane" 
+            }
+        }  
+    ],
+    "query": {
+        "bool" : {
+            "must" : {
+                "match" : {
+                    "measurement.chemical": "NO2"
+                }
+            },
+            "filter" : {
+                "geo_distance" : {
+                    "distance" : "1km",
+                    "location" : {
+                        "lat" : 40.4142923,
+                        "lon" : -3.6912903
+                    }
+                }
+            }
+        }
+    }
+}
